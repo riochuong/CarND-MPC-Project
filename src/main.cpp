@@ -98,13 +98,38 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          // transformed all points to car perspective so the polyfit should
+          // have the trajectory with respect to car p.o.v
+          vector<double> way_x;
+          vector<double> way_y;
+
+          for (int i = 0; i < ptsx.size(); i++) {
+             double translation_x = ptsx[i] - px;
+             double translation_y = ptsy[i] - py;
+             // apply rotation here 
+             std::cout << "psi " << psi << " trans " << translation_x << std::endl;
+             way_x.push_back(translation_x * cos(psi) + (translation_y) * sin(psi));
+             way_y.push_back((-1) * (translation_x * sin(psi)) + translation_y * cos(psi));
+
+          }
+          Eigen::Map<Eigen::VectorXd> way_x_e(&way_x[0], way_x.size());
+          Eigen::Map<Eigen::VectorXd> way_y_e(&way_y[0], way_y.size());
+
+          auto coeffs = polyfit(way_x_e, way_y_e, 2);
+          double epsi = (-1) * atan(coeffs[1]);
+          double cte = polyeval(coeffs, 0);
+          Eigen::VectorXd state(6) ;
+          std::cout << "v : " << v << " cte: " << cte << " epsi: "<< epsi << std::endl;
+          state << 0.0, 0.0, 0.0, v, cte, epsi;
+          vector<double> solution = mpc.Solve(state, coeffs);
+          // due to reverse sign need to multiply by -1
+          double steer_value = solution[0] * (-1);
+          double throttle_value = solution[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = steer_value / deg2rad(25);
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 

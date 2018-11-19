@@ -6,8 +6,8 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 0;
-double dt = 0;
+size_t N = 10;
+double dt = 0.2;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -20,6 +20,16 @@ double dt = 0;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
+const int COST_IDX = 0;
+const int X_START = 0;
+const int Y_START = X_START + N;
+const int PSI_START = Y_START + N;
+const int V_START = PSI_START + N;
+const int CTE_START = V_START + N;
+const int EPSI_START = CTE_START + N;
+const int DELTA_START = EPSI_START + N;
+const int ACC_START = DELTA_START + N - 1;
+const double REF_V = 20.0;
 
 class FG_eval {
  public:
@@ -33,6 +43,64 @@ class FG_eval {
     // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
+    // DEFINE COST FUNCTION AND CONSTRAIN
+
+    // COST FUNCTION
+    // add errors from CTE and steady speed 
+    for (int i = 0; i < N; i++){
+        fg[0] += CppAD::pow(vars[CTE_START + i], 2);
+        fg[0] += CppAD::pow(vars[EPSI_START+ i], 2);
+        fg[0] += CppAD::pow(vars[V_START+ i] - REF_V, 2);
+    }
+    
+    // actuators need to be smooth so we are not acc fast off the path 
+    for (int i = 0; i < N - 1; i++){
+        fg[0] += CppAD::pow(vars[DELTA_START + i], 2);
+        fg[0] += CppAD::pow(vars[ACC_START+ i], 2);
+    }
+
+    // minimize gap between actuation state so changing lane will be smoother
+    for (int i = 0; i < N - 2; i++){
+        fg[0] += CppAD::pow(vars[DELTA_START + i] - vars[DELTA_START + i + 1], 2);
+        fg[0] += CppAD::pow(vars[ACC_START+ i] - vars[ACC_START+ i + 1], 2);
+    }
+
+    
+    // INITIALIZE CONSTRAINS
+    fg[X_START + 1] = vars[X_START];
+    fg[Y_START + 1] = vars[Y_START];
+    fg[PSI_START + 1] = vars[PSI_START];
+    fg[V_START + 1] = vars[V_START];
+    fg[CTE_START + 1] = vars[CTE_START];
+    fg[EPSI_START + 1] = vars[EPSI_START];
+    
+    // set on subsequent constrain based on model state update equations
+    for (int i = 1; i < N; i++){
+        
+        fg[X_START + i + 1] = vars[X_START + i] - 
+            (vars[X_START + i - 1] + vars[V_START + i - 1]* CppAD::cos(vars[PSI_START + i - 1]) * dt);
+        
+        fg[Y_START + i + 1] = vars[Y_START + i] - 
+            (vars[Y_START + i - 1] + vars[V_START + i - 1] * CppAD::sin(vars[PSI_START + i - 1]) * dt);
+        
+        fg[PSI_START + i + 1] = vars[PSI_START + i] -
+                    (vars[PSI_START + i - 1] + vars[V_START + i - 1] * vars[DELTA_START + i - 1] * dt / Lf );  
+        
+        fg[V_START + i + 1] = vars[V_START + i] - (vars[V_START + i - 1] + vars[ACC_START + i - 1] * dt);
+
+        fg[CTE_START + i + 1] = vars[CTE_START + i] - 
+                ((coeffs[0] * vars[X_START+i - 1] + coeffs[1])
+                 - vars[Y_START + i - 1] + vars[V_START + i - 1] * CppAD::sin(vars[EPSI_START + i - 1]) * dt);
+        
+        fg[EPSI_START + i + 1] = vars[EPSI_START + i] -
+                     (vars[PSI_START + i - 1] - CppAD::atan(coeffs[1]) 
+                      + vars[V_START + i - 1] * vars[DELTA_START + i - 1] / Lf * dt);
+
+    }
+
+
+
+
   }
 };
 
@@ -52,9 +120,9 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  size_t n_vars = 0;
+  size_t n_vars = 6 * N + 2 * (N -1);
   // TODO: Set the number of constraints
-  size_t n_constraints = 0;
+  size_t n_constraints = N * 6;
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
@@ -66,6 +134,23 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
+  for (int i = X_START; i < DELTA_START; i++) {
+      vars_lowerbound[i] = -1.0e19;  
+      vars_upperbound[i] = 1.0e19;
+  }
+ 
+  // Steering limitations
+   for (int i = DELTA_START; i < ACC_START; i++) {
+        vars_lowerbound[i] = -0.436332;
+        vars_upperbound[i] = 0.436332;
+  }
+
+  // acceleration limitations
+  for (int i = ACC_START; i < n_vars; i++) {
+        vars_lowerbound[i] = -1;
+        vars_upperbound[i] = 1;
+  }
+
 
   // Lower and upper limits for the constraints
   // Should be 0 besides initial state.
@@ -75,6 +160,23 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
   }
+
+  // set constrain for initial value 
+  constraints_lowerbound[X_START] = state[0];
+  constraints_lowerbound[Y_START] = state[1];
+  constraints_lowerbound[PSI_START] = state[2];
+  constraints_lowerbound[V_START] = state[3];
+  constraints_lowerbound[CTE_START] = state[4];
+  constraints_lowerbound[EPSI_START] = state[5];
+
+  constraints_upperbound[X_START] = state[0];
+  constraints_upperbound[Y_START] = state[1];
+  constraints_upperbound[PSI_START] = state[2];
+  constraints_upperbound[V_START] = state[3];
+  constraints_upperbound[CTE_START] = state[4];
+  constraints_upperbound[EPSI_START] = state[5];
+
+
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
@@ -117,5 +219,5 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {};
+  return {solution.x[0], solution.x[1]};
 }
