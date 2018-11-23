@@ -58,7 +58,7 @@ class FG_eval {
     
     // actuators need to be smooth so we are not acc fast off the path 
     for (int i = 0; i < N - 1; i++){
-        fg[0] += 120000 * CppAD::pow(vars[DELTA_START + i], 2);
+        fg[0] += 20000 * CppAD::pow(vars[DELTA_START + i], 2);
         fg[0] += 30 * CppAD::pow(vars[ACC_START+ i], 2);
         // make sure we dont turn too steep while speed up 
         fg[0] += 100000 * CppAD::pow(vars[V_START+ i] - vars[V_START+ i + 1], 2) * vars[DELTA_START + i];
@@ -66,7 +66,7 @@ class FG_eval {
 
     // minimize gap between actuation state so changing lane will be smoother
     for (int i = 0; i < N - 2; i++){
-        fg[0] += 1000000 * CppAD::pow(vars[DELTA_START + i] - vars[DELTA_START + i + 1], 2);
+        fg[0] += 5000000 * CppAD::pow(vars[DELTA_START + i] - vars[DELTA_START + i + 1], 2);
         fg[0] += CppAD::pow(vars[ACC_START+ i] - vars[ACC_START+ i + 1], 2);
          
     }
