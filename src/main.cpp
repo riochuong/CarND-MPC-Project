@@ -16,6 +16,7 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+double from_mph_to_mps(double x) { return x * 1609.34 / 3600; }
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -77,7 +78,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    //cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -107,7 +108,7 @@ int main() {
              double translation_x = ptsx[i] - px;
              double translation_y = ptsy[i] - py;
              // apply rotation here 
-             std::cout << "psi " << psi << " trans " << translation_x << std::endl;
+             //std::cout << "psi " << psi << " trans " << translation_x << std::endl;
              way_x.push_back(translation_x * cos(psi) + (translation_y) * sin(psi));
              way_y.push_back((-1) * (translation_x * sin(psi)) + translation_y * cos(psi));
 
@@ -115,12 +116,13 @@ int main() {
           Eigen::Map<Eigen::VectorXd> way_x_e(&way_x[0], way_x.size());
           Eigen::Map<Eigen::VectorXd> way_y_e(&way_y[0], way_y.size());
 
-          auto coeffs = polyfit(way_x_e, way_y_e, 2);
+          auto coeffs = polyfit(way_x_e, way_y_e, 3);
           double epsi = (-1) * atan(coeffs[1]);
           double cte = polyeval(coeffs, 0);
           Eigen::VectorXd state(6) ;
           std::cout << "v : " << v << " cte: " << cte << " epsi: "<< epsi << std::endl;
-          state << 0.0, 0.0, 0.0, v, cte, epsi;
+          state << 0.0, 0.0, 0.0, from_mph_to_mps(v), cte, epsi;
+          //state << 0.0, 0.0, 0.0, v, cte, epsi;
           vector<double> solution = mpc.Solve(state, coeffs);
           // due to reverse sign need to multiply by -1
           double steer_value = solution[0] * (-1);
@@ -129,12 +131,17 @@ int main() {
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value / deg2rad(25);
+          msgJson["steering_angle"] = steer_value / deg2rad(25.0);
           msgJson["throttle"] = throttle_value;
 
-          //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          std::cout << "STEERING ANGLE: " << steer_value << std::endl;
+          std::cout << "THROTTLE: " << msgJson["throttle"] << std::endl;
+
+          //Display the MPC predicted trajector 
+          int N = 15;
+          vector<double> mpc_x_vals (solution.begin() + 2, solution.begin() + 2 + N - 1);
+          vector<double> mpc_y_vals  (solution.begin() + 2 + N, solution.begin() + 2 + N + N - 1);
+
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -143,8 +150,8 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+          vector<double> next_x_vals = way_x;
+          vector<double> next_y_vals = way_y;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
@@ -154,7 +161,7 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+         // std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
@@ -164,7 +171,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+//          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
