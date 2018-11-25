@@ -121,7 +121,7 @@ int main() {
           double epsi = (-1) * atan(coeffs[1]);
           double cte = polyeval(coeffs, 0);
           Eigen::VectorXd state(6) ;
-          std::cout << "v : " << v << " cte: " << cte << " epsi: "<< epsi << std::endl;
+          //std::cout << "v : " << v << " cte: " << cte << " epsi: "<< epsi << std::endl;
           state << 0.0, 0.0, 0.0, v, cte, epsi;
           //state << 0.0, 0.0, 0.0, v, cte, epsi;
           vector<double> solution = mpc.Solve(state, coeffs);
@@ -139,7 +139,7 @@ int main() {
           std::cout << "THROTTLE: " << msgJson["throttle"] << std::endl;
 
           //Display the MPC predicted trajector 
-          int N = 15;
+          int N = 20;
           vector<double> mpc_x_vals (solution.begin() + 2, solution.begin() + 2 + N - 1);
           vector<double> mpc_y_vals  (solution.begin() + 2 + N, solution.begin() + 2 + N + N - 1);
 
@@ -162,7 +162,7 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-         std::cout << msg << "\n" << std::endl;
+         //std::cout << msg << "\n" << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
@@ -172,7 +172,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-//          this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
