@@ -7,7 +7,7 @@ using CppAD::AD;
 
 // TODO: Set the timestep length and duration
 size_t N = 20;
-double dt = 0.08;
+double dt = 0.05;
 // This value assumes the model presented in the classroom is used.
 //
 // It was obtained by measuring the radius formed by running the vehicle in the
@@ -28,7 +28,7 @@ const int CTE_START = V_START + N;
 const int EPSI_START = CTE_START + N;
 const int DELTA_START = EPSI_START + N;
 const int ACC_START = DELTA_START + N - 1;
-const double REF_V = 20.0;
+const double REF_V = 30.0;
 
 
 
@@ -50,17 +50,16 @@ class FG_eval {
     // COST FUNCTION
     // add errors from CTE and steady speed 
     for (int i = 0; i < N; i++){
-        fg[0] +=  1000 * CppAD::pow(vars[CTE_START + i], 2);
-        fg[0] +=  1000 * CppAD::pow(vars[EPSI_START+ i], 2);
+        fg[0] +=  950 * CppAD::pow(vars[CTE_START + i], 2);
+        fg[0] +=  950 * CppAD::pow(vars[EPSI_START+ i], 2);
         fg[0] += 5 * CppAD::pow(vars[V_START+ i] - REF_V, 2);
         if (i < N -1) { 
-            fg[0] += 50000 * CppAD::pow(vars[DELTA_START + i], 2);
+            fg[0] += 55000 * CppAD::pow(vars[DELTA_START + i], 2);
             fg[0] += 100 * CppAD::pow(vars[ACC_START+ i], 2);
         }
         // make sure we dont turn too steep while speed up 
         if ( i < N -2) {
             fg[0] += 2e8 * CppAD::pow(vars[DELTA_START + i] - vars[DELTA_START + i + 1], 2);
-            fg[0] += 500 * CppAD::pow(vars[V_START+ i] - vars[V_START+ i + 1], 2) * vars[DELTA_START + i];
             fg[0] += 500 * CppAD::pow(vars[ACC_START+ i] - vars[ACC_START+ i + 1], 2);
         }
     }
@@ -150,11 +149,11 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   }
  
   // Steering limitations
-   for (int i = DELTA_START; i < ACC_START; i++) {
-        vars_lowerbound[i] = -0.436332 * Lf;
-        vars_upperbound[i] = 0.436332 * Lf;
-        //vars_upperbound[i] = -0.34906 * Lf;
-        //vars_upperbound[i] = 0.34906 * Lf;
+  for (int i = DELTA_START; i < ACC_START; i++) {
+      vars_lowerbound[i] = -0.436332 * Lf;
+      vars_upperbound[i] = 0.436332 * Lf;
+  //      vars_lowerbound[i] = -0.34906 * Lf;
+    //    vars_upperbound[i] = 0.34906 * Lf;
   }
 
   // acceleration limitations
