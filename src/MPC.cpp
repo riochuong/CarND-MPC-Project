@@ -28,7 +28,7 @@ const int CTE_START = V_START + N;
 const int EPSI_START = CTE_START + N;
 const int DELTA_START = EPSI_START + N;
 const int ACC_START = DELTA_START + N - 1;
-const double REF_V = 15.0;
+const double REF_V = 20.0;
 
 
 
@@ -46,30 +46,29 @@ class FG_eval {
     // the Solver function below.
     // DEFINE COST FUNCTION AND CONSTRAIN
     fg[0] = 0;
+   
     // COST FUNCTION
     // add errors from CTE and steady speed 
     for (int i = 0; i < N; i++){
         fg[0] +=  5000 * CppAD::pow(vars[CTE_START + i], 2);
         fg[0] +=  5000 * CppAD::pow(vars[EPSI_START+ i], 2);
-        fg[0] += 2 * CppAD::pow(vars[V_START+ i] - REF_V, 2); 
-        //fg[0] += 20000 * CppAD::pow(3 * coeffs[2] * CppAD::pow(vars[X_START +i], 2), 2);
- 
-    }
-    
-    // actuators need to be smooth so we are not acc fast off the path 
-    for (int i = 0; i < N - 1; i++){
-        fg[0] += 20000 * CppAD::pow(vars[DELTA_START + i], 2);
-        fg[0] += 30 * CppAD::pow(vars[ACC_START+ i], 2);
+        fg[0] += 5 * CppAD::pow(vars[V_START+ i] - REF_V, 2);
+        if (i < N -1) { 
+            fg[0] += 100000 * CppAD::pow(vars[DELTA_START + i], 2);
+            fg[0] += 30 * CppAD::pow(vars[ACC_START+ i], 2);
+        }
         // make sure we dont turn too steep while speed up 
-        fg[0] += 100000 * CppAD::pow(vars[V_START+ i] - vars[V_START+ i + 1], 2) * vars[DELTA_START + i];
+        if ( i < N -2) {
+            fg[0] += 2e8 * CppAD::pow(vars[DELTA_START + i] - vars[DELTA_START + i + 1], 2);
+            fg[0] += 1000 * CppAD::pow(vars[V_START+ i] - vars[V_START+ i + 1], 2) * vars[DELTA_START + i];
+            fg[0] += CppAD::pow(vars[ACC_START+ i] - vars[ACC_START+ i + 1], 2);
+        }
     }
 
-    // minimize gap between actuation state so changing lane will be smoother
-    for (int i = 0; i < N - 2; i++){
-        fg[0] += 5000000 * CppAD::pow(vars[DELTA_START + i] - vars[DELTA_START + i + 1], 2);
-        fg[0] += CppAD::pow(vars[ACC_START+ i] - vars[ACC_START+ i + 1], 2);
-         
-    }
+    AD<double> dist_square = CppAD::pow(vars[X_START] - vars[X_START + N -1], 2) +  CppAD::pow(vars[Y_START] - vars[Y_START + N -1], 2) + 0.01;
+    fg[0] += 1 / dist_square * 100;
+
+
 
     
     // INITIALIZE CONSTRAINS
@@ -80,7 +79,6 @@ class FG_eval {
     fg[CTE_START + 1] = vars[CTE_START];
     fg[EPSI_START + 1] = vars[EPSI_START];
     
-   
     // set on subsequent constrain based on model state update equations
     for (int i = 1; i < N; i++){
          AD<double> x0 = vars[X_START + i -1];
@@ -107,8 +105,6 @@ class FG_eval {
                       + vars[V_START + i - 1] * vars[DELTA_START + i - 1] / Lf * dt);
 
     }
-
-
 
 
   }
@@ -161,8 +157,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
  
   // Steering limitations
    for (int i = DELTA_START; i < ACC_START; i++) {
-        vars_lowerbound[i] = -0.436332;
-        vars_upperbound[i] = 0.436332;
+        vars_lowerbound[i] = -0.436332 * Lf;
+        vars_upperbound[i] = 0.436332 * Lf;
   }
 
   // acceleration limitations
