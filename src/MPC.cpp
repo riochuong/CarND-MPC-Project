@@ -28,7 +28,7 @@ const int CTE_START = V_START + N;
 const int EPSI_START = CTE_START + N;
 const int DELTA_START = EPSI_START + N;
 const int ACC_START = DELTA_START + N - 1;
-const double REF_V = 50.0;
+const double REF_V = 70.0;
 
 
 
