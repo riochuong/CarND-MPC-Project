@@ -55,6 +55,10 @@ Finally, we feed the initial state to the solver to optimize the actuators comma
 ### Model Predictive Control with Latency
 In order to due with control latency, I first reduce the dt (elapsed between timesteps) to 0.08 so we can accomodate for some latency. Also, after observing the car is not slowing down soon enough to make the tight left turn after crossing the bridge, I add another penalty term which related to the product of veloctiy and steering angle at a specific moment in order to help the car slow down at steep turn and not running off the road due to some latency.
 
+        // avoid card turning to sharp while at high speed
+        fg[0] += 500 * CppAD::pow(vars[V_START + i] * vars[DELTA_START + i], 2);
+
+
 
 
 
