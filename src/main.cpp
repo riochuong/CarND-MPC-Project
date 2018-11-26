@@ -116,14 +116,13 @@ int main() {
           Eigen::Map<Eigen::VectorXd> way_x_e(&way_x[0], way_x.size());
           Eigen::Map<Eigen::VectorXd> way_y_e(&way_y[0], way_y.size());
 
+          // fit the 3rd order polynomial through the waypoints w.r.t car coordinates
           auto coeffs = polyfit(way_x_e, way_y_e, 3);
           // simple as epsi = psi - atan(coeffs[1] + 2 * px * coeffs[2] + 3 * px^2 coeffs[3] => psi=0, px=0;
           double epsi = (-1) * atan(coeffs[1]);
           double cte = polyeval(coeffs, 0);
           Eigen::VectorXd state(6) ;
-          //std::cout << "v : " << v << " cte: " << cte << " epsi: "<< epsi << std::endl;
           state << 0.0, 0.0, 0.0, v, cte, epsi;
-          //state << 0.0, 0.0, 0.0, v, cte, epsi;
           vector<double> solution = mpc.Solve(state, coeffs);
           // due to reverse sign need to multiply by -1
           double steer_value = solution[0] * (-1);

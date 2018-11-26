@@ -38,6 +38,17 @@ Thus they are needed to be transform to the car coordinates using translation an
 
 Also, we need to calculate the initial orientation erorr and crosstrack error with respect to car coordinate system as below:
 
+          // fit the 3rd order polynomial through the waypoints w.r.t car coordinates
+          auto coeffs = polyfit(way_x_e, way_y_e, 3);
+          // simple as epsi = psi - atan(coeffs[1] + 2 * px * coeffs[2] + 3 * px^2 coeffs[3] => psi=0, px=0;
+          double epsi = (-1) * atan(coeffs[1]);
+          double cte = polyeval(coeffs, 0);
+          Eigen::VectorXd state(6) ;
+          state << 0.0, 0.0, 0.0, v, cte, epsi;
+ 
+
+
+
 Finally, we feed the initial state to the solver to optimize the actuators command.
 
 
